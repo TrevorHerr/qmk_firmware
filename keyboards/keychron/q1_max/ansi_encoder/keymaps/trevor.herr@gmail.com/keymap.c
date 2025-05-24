@@ -16,6 +16,7 @@
 
 #include QMK_KEYBOARD_H
 #include "keychron_common.h"
+#include "os_detection.h"
 
 enum layers {
     MAC_BASE,
@@ -69,11 +70,40 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][2] = {
 };
 #endif // ENCODER_MAP_ENABLE
 
+// Add timer variables
+static uint32_t last_os_check = 0;
+static os_variant_t last_os = OS_UNSURE;
+
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!process_record_keychron_common(keycode, record)) {
         return false;
     }
     return true;
+}
+
+void housekeeping_task_user(void) {
+    // Check OS every 500ms instead of 50ms
+    uint32_t current_time = timer_read32();
+    if (timer_elapsed32(last_os_check) > 500) {  // Check every 500ms
+        last_os_check = current_time;
+        
+        // Get current OS
+        os_variant_t current_os = detected_host_os();
+        
+        // Only switch if OS has changed
+        if (current_os != last_os) {
+            last_os = current_os;
+            
+            switch (current_os) {
+                case OS_WINDOWS:
+                    layer_move(WIN_BASE);
+                    break;
+                default:
+                    layer_move(MAC_BASE);
+                    break;
+            }
+        }
+    }
 }
 
 #ifdef RGB_MATRIX_ENABLE
